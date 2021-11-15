@@ -2,10 +2,19 @@ package com.sde.smartmailbox;
 
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
+import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.ParcelUuid;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -27,11 +36,27 @@ import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
 public class MainActivity extends AppCompatActivity {
     MqttHelper mqttHelper;
     private ActivityMainBinding binding;
     public static final String CHANNEL_ID = "101";
     public static final String CHANNEL_NAME = "notifications";
+
+    // Bluettoth configuration
+    BluetoothAdapter bluetoothAdapter;
+    BluetoothLeScanner scanner;
+    UUID BLP_SERVICE_UUID = UUID.fromString("2af412d8-3e7e-11ec-9bbc-0242ac130002");
+    UUID[] serviceUUIDs = new UUID[]{BLP_SERVICE_UUID};
+    List<ScanFilter> filters = null;
+    ScanSettings scanSettings = new ScanSettings.Builder()
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
+            .setReportDelay(0L)
+            .build();
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,12 +104,62 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        // Bluetooth
+        bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        scanner = bluetoothAdapter.getBluetoothLeScanner();
+
+        if( serviceUUIDs != null ) {
+            filters = new ArrayList<>();
+            for (UUID serviceUUID : serviceUUIDs) {
+                ScanFilter filter = new ScanFilter.Builder()
+                        .setServiceUuid(new ParcelUuid(serviceUUID))
+                        .build();
+                filters.add(filter);
+            }
+        }
+
+        if (scanner != null) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+                Log.d("BLE", "scan started");
+                scanner.startScan(filters, scanSettings, scanCallback);
+            } else {
+                // Unless required permissions were acquired, scan does not start.
+
+            }
+
+        }  else {
+            Log.e("BLE", "could not get scanner object");
+        }
+
+
         // Create notification channel
         createNotificationChannel();
 
         // Start mqtt service
         startMqtt();
     }
+
+    private final ScanCallback scanCallback = new ScanCallback() {
+        @Override
+        public void onScanResult(int callbackType, ScanResult result) {
+            BluetoothDevice device = result.getDevice();
+            // ...do whatever you want with this found device
+            Log.d("BLE", "He encontrado el puto bleeeeeeeeeeee");
+
+        }
+
+        @Override
+        public void onBatchScanResults(List<ScanResult> results) {
+            // Ignore for now
+        }
+
+        @Override
+        public void onScanFailed(int errorCode) {
+            // Ignore for now
+            Log.d("ERROOOOOOOOR", "dwedwed");
+
+        }
+    };
 
     private void startMqtt(){
         mqttHelper = new MqttHelper(getApplicationContext());
