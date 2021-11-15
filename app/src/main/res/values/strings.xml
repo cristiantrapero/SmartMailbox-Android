@@ -3,4 +3,11 @@
     <string name="title_home">Home</string>
     <string name="title_dashboard">Dashboard</string>
     <string name="title_notifications">Notifications</string>
+    <string name="open_mailbox">Open mailbox</string>
+    <string name="change_pin">Change pin</string>
+    <string name="select_pin_text">Select a 6 digits pin</string>
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="wifi">WiFi</string>
+    <string name="bluetooth">Bluetooth</string>
 </resources>

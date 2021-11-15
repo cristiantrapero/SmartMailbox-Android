@@ -14,10 +14,10 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.ParcelUuid;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
@@ -30,6 +30,7 @@ import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
+import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.sde.smartmailbox.databinding.ActivityMainBinding;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
@@ -69,11 +70,30 @@ public class MainActivity extends AppCompatActivity {
         // Passing each menu ID as a set of Ids because each
         // menu should be considered as top level destinations.
         AppBarConfiguration appBarConfiguration = new AppBarConfiguration.Builder(
-                R.id.navigation_home, R.id.navigation_dashboard, R.id.navigation_notifications)
+                R.id.navigation_home, R.id.navigation_notifications)
                 .build();
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_activity_main);
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
         NavigationUI.setupWithNavController(binding.navView, navController);
+
+        MaterialButtonToggleGroup materialButtonToggleGroup =
+                findViewById(R.id.toggleButton);
+
+        LinearLayout bluetoothButtons = (LinearLayout) findViewById(R.id.bluetoothButtons);
+        bluetoothButtons.setVisibility(View.INVISIBLE);
+
+        materialButtonToggleGroup.addOnButtonCheckedListener(new MaterialButtonToggleGroup.OnButtonCheckedListener() {
+            @Override
+            public void onButtonChecked(MaterialButtonToggleGroup group, int checkedId, boolean isChecked) {
+                if(group.getCheckedButtonId()==R.id.enableWifi)
+                {
+                    bluetoothButtons.setVisibility(View.INVISIBLE);
+
+                }else if(group.getCheckedButtonId()==R.id.enableBLE) {
+                    bluetoothButtons.setVisibility(View.VISIBLE);
+                }
+            }
+        });
 
         final Button openButton = findViewById(R.id.openButton);
         openButton.setOnClickListener(new View.OnClickListener() {
