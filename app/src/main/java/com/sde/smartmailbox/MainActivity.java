@@ -55,7 +55,10 @@ public class MainActivity extends AppCompatActivity {
     public static final String CHANNEL_ID = "101";
     public static final String CHANNEL_NAME = "notifications";
 
-    // Bluettoth configuration
+    Button connectButton;
+    Button disconnectButton;
+
+    // Bluetooth configuration
     BluetoothManager bluetoothManager;
     BluetoothAdapter bluetoothAdapter;
     BluetoothLeScanner scanner;
@@ -69,7 +72,9 @@ public class MainActivity extends AppCompatActivity {
     public static final UUID UUID_SERVICE = UUID.fromString("2af412d8-3e7e-11ec-9bbc-0242ac130002");
     public static final UUID UUID_CHARACTERISTIC_OPEN = UUID.fromString("e7a6ec42-2713-4484-81d5-39e5d3e9060b");
     public static final UUID UUID_CHARACTERISTIC_PIN = UUID.fromString("12fa1c0a-25cc-4281-9c22-8e7951b1ac03");
-    public static final UUID UUID_DESCRIPTOR = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
+    public static final String TAGBLESCANNER = "BLEScanner";
+    public static final String TAGBLE = "BLE";
+    public static boolean BLEMode = false;
 
     UUID[] serviceUUIDs = new UUID[]{UUID_SERVICE};
     List<ScanFilter> filters = null;
@@ -103,7 +108,11 @@ public class MainActivity extends AppCompatActivity {
         openButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                mqttHelper.publishMessage("smartmailbox/relay", "on");
+                if (BLEMode){
+                    sendOpenCommandByBLE();
+                }else{
+                    mqttHelper.publishMessage("smartmailbox/relay", "on");
+                }
             }
         });
 
@@ -111,12 +120,16 @@ public class MainActivity extends AppCompatActivity {
         changePinButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Log.d("Boton", "Cambio pin");
+                Log.d("Boton", "Changing pin");
                 EditText editText = findViewById(R.id.pinPasswordEditText);
                 String pinText = editText.getText().toString();
                 if (!"".equals(pinText)){
                     Log.d("PIN", pinText);
-                    mqttHelper.publishMessage("smartmailbox/pin", pinText);
+                    if (BLEMode){
+                        sendChangePinCommandByBLE(pinText);
+                    }else{
+                        mqttHelper.publishMessage("smartmailbox/pin", pinText);
+                    }
                 } else{
                     showMessage("Tienes que seleccionar un PIN");
                 }
@@ -129,13 +142,16 @@ public class MainActivity extends AppCompatActivity {
                 if(group.getCheckedButtonId()==R.id.enableWifi)
                 {
                     bluetoothButtons.setVisibility(View.INVISIBLE);
+                    BLEMode = false;
+
                 }else if(group.getCheckedButtonId()==R.id.enableBLE) {
                     bluetoothButtons.setVisibility(View.VISIBLE);
+                    BLEMode = true;
                 }
             }
         });
 
-        final Button connectButton = findViewById(R.id.connectBLE);
+        connectButton = findViewById(R.id.connectBLE);
         connectButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -144,7 +160,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        final Button disconnectButton = findViewById(R.id.disconnectBLE);
+        disconnectButton = findViewById(R.id.disconnectBLE);
         disconnectButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -163,13 +179,19 @@ public class MainActivity extends AppCompatActivity {
     private BluetoothGattCallback bluetoothGattCallback = new BluetoothGattCallback() {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-            Log.d("BLE", "Detectando cambios en gatt");
+            Log.d(TAGBLE, "Changes in Gatt connection state");
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                Log.d("BLE", "A descubrir cosas");
+                Log.d(TAGBLE, "Stop BLE scan");
                 scanner.stopScan(scanCallback);
                 //showMessage("Conectado por BLE");
-
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        disconnectButton.setEnabled(true);
+                        connectButton.setEnabled(false);
+                    }
+                });
                 gatt.discoverServices();
             } else {
                 gatt.close();
@@ -184,24 +206,18 @@ public class MainActivity extends AppCompatActivity {
 
                 service = gatt.getService(UUID_SERVICE);
                 if (service != null) {
-                    Log.i("BLE", "Service connected");
+                    Log.i(TAGBLE, "Service obtained");
                     openCharacteristic = service.getCharacteristic(UUID_CHARACTERISTIC_OPEN);
                     if (openCharacteristic != null){
-                        Log.i("BLE", "Tengo caracteristica de abrir");
-                        //openCharacteristic.setValue("on");
-                        //bluetoothGatt.writeCharacteristic(openCharacteristic);
+                        Log.i(TAGBLE, "Open characteristic found");
                     }else{
-                        Log.i("BLE", "No veo open");
-
+                        Log.i(TAGBLE, "Open characteristic not found");
                     }
                     pinCharacteristic = service.getCharacteristic(UUID_CHARACTERISTIC_PIN);
                     if (pinCharacteristic != null){
-                        Log.i("BLE", "Tengo caracteristica de pin");
-                        pinCharacteristic.setValue("3321");
-                        bluetoothGatt.writeCharacteristic(pinCharacteristic);
+                        Log.i("BLE", "Pin characteristic found");
                     }else {
-                        Log.i("BLE", "No veo pin");
-
+                        Log.i(TAGBLE, "Pin characteristic not found");
                     }
                 }
 
@@ -209,7 +225,23 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    private  void sendChangePinCommandByBLE(String pin){
+        pinCharacteristic.setValue(pin);
+        bluetoothGatt.writeCharacteristic(pinCharacteristic);
+    }
+
+    private void sendOpenCommandByBLE(){
+        openCharacteristic.setValue("on");
+        bluetoothGatt.writeCharacteristic(openCharacteristic);
+    }
+
     private void bleDisconnect(){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                connectButton.setEnabled(true);
+            }
+        });
         bluetoothGatt.disconnect();
     }
 
@@ -224,13 +256,13 @@ public class MainActivity extends AppCompatActivity {
     private ScanCallback scanCallback = new ScanCallback() {
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
-            Log.d("BLE", "ha ido dpm");
+            Log.d(TAGBLE, "BLE scan result");
             super.onScanResult(callbackType, result);
         }
 
         @Override
         public void onBatchScanResults(List<ScanResult> results) {
-            Log.d("BLEResuuuuuuuuults", "ya tengo los resultados");
+            Log.d(TAGBLE, "BLE scan results");
             bluetoothDevice = results.get(0).getDevice();
             bluetoothGatt = bluetoothDevice.connectGatt(getApplicationContext(), false, bluetoothGattCallback, BluetoothDevice.TRANSPORT_LE);
             super.onBatchScanResults(results);
@@ -238,13 +270,12 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onScanFailed(int errorCode) {
-            Log.d("BLEFallo", "ha fallao el escaneo");
+            Log.d(TAGBLE, "Scan error");
             super.onScanFailed(errorCode);
         }
     };
 
     private void startBLE(){
-        String TAG = "BLECristian";
         bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         bluetoothAdapter = bluetoothManager.getAdapter();
 
@@ -283,9 +314,9 @@ public class MainActivity extends AppCompatActivity {
                         .build();
             }
             scanner.startScan(filters, scanSettings, scanCallback);
-            Log.d(TAG, "scan started");
+            Log.d(TAGBLESCANNER, "BLE scan started");
         }  else {
-            Log.e(TAG, "could not get scanner object");
+            Log.e(TAGBLESCANNER, "Could not get scanner object");
         }
     }
 
@@ -317,7 +348,7 @@ public class MainActivity extends AppCompatActivity {
                     generateNotification("Buzon abierto", "Buzon abierto el "+mqttMessage.toString());
 
                 } else{
-                    Log.w("MQTT", "Buzon abierto a las "+mqttMessage.toString());
+                    Log.w("MQTT", "Pin cambiado el "+mqttMessage.toString());
                     generateNotification("PIN cambiado", "Pin cambiado el "+mqttMessage.toString());
                 }
             }
