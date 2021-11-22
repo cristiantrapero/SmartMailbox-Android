@@ -240,6 +240,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 connectButton.setEnabled(true);
+                disconnectButton.setEnabled(false);
             }
         });
         bluetoothGatt.disconnect();
@@ -336,12 +337,12 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void messageArrived(String topic, MqttMessage mqttMessage) throws Exception {
                 if (topic.equals("smartmailbox/openrequest")){
-                    Log.w("MQTT", "Abre la puta puerta.");
-                    generateNotification("Abrir buzon", "Solicitud de apertura de buzon");
+                    Log.w("MQTT", "Abre el buzon");
+                    generateNotification("Abrir buzon", "Solicitud recibida el "+mqttMessage.toString());
 
                 }else if (topic.equals("smartmailbox/letter")){
                     Log.w("MQTT", "Carta recibida a las "+mqttMessage.toString());
-                    generateNotification("Correo nuevo", "Tienes nuevo correo que recoger");
+                    generateNotification("Correo nuevo", "Tienes correo que recoger el "+mqttMessage.toString());
 
                 }else if (topic.equals("smartmailbox/opened")){
                     Log.w("MQTT", "Buzon abierto a las "+mqttMessage.toString());
@@ -382,7 +383,9 @@ public class MainActivity extends AppCompatActivity {
                 .setContentTitle(title)
                 .setContentText(text)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setVibrate(new long[] { 1000, 1000, 1000, 1000, 1000 })
                 .setContentIntent(pendingIntent)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(text))
                 .setAutoCancel(true);
 
         NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
